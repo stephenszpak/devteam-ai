@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: devteam_ai_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - devteam_network
+
+  backend:
+    build:
+      context: ./apps/backend
+      dockerfile: dev.Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      DATABASE_URL: "ecto://postgres:postgres@postgres/devteam_ai_dev"
+      PHX_HOST: "0.0.0.0"
+    depends_on:
+      - postgres
+    volumes:
+      - ./apps/backend:/app
+      - backend_deps:/app/deps
+      - backend_build:/app/_build
+    networks:
+      - devteam_network
+
+  frontend:
+    build:
+      context: ./apps/frontend
+      dockerfile: dev.Dockerfile
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./apps/frontend:/app
+      - frontend_modules:/app/node_modules
+    networks:
+      - devteam_network
+
+  agents:
+    build:
+      context: ./agents
+      dockerfile: dev.Dockerfile
+    volumes:
+      - ./agents:/app
+    networks:
+      - devteam_network
+    environment:
+      BACKEND_URL: "http://backend:4000"
+
+volumes:
+  postgres_data:
+  backend_deps:
+  backend_build:
+  frontend_modules:
+
+networks:
+  devteam_network:
+    driver: bridge
