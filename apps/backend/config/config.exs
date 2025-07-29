@@ -3,7 +3,7 @@ import Config
 config :devteam_ai,
   ecto_repos: [DevteamAi.Repo]
 
-config :devteam_ai_web, DevteamAiWeb.Endpoint,
+config :devteam_ai, DevteamAiWeb.Endpoint,
   url: [host: "localhost"],
   render_errors: [
     formats: [html: DevteamAiWeb.ErrorHTML, json: DevteamAiWeb.ErrorJSON],

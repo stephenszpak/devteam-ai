@@ -7,9 +7,9 @@ defmodule DevteamAi.Application do
   def start(_type, _args) do
     children = [
       DevteamAi.Repo,
-      {DNSCluster, query: Application.get_env(:devteam_ai, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: DevteamAi.PubSub},
       {Finch, name: DevteamAi.Finch},
+      DevteamAiWeb.Telemetry,
       DevteamAiWeb.Endpoint,
       DevteamAi.AgentOrchestrator
     ]

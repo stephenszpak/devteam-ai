@@ -9,6 +9,7 @@ defmodule DevteamAiWeb.Endpoint do
   ]
 
   socket "/live", Phoenix.LiveView.Socket, websocket: [connect_info: [session: @session_options]]
+  socket "/socket", DevteamAiWeb.UserSocket, websocket: true, longpoll: false
 
   plug CORSPlug,
     origin: ["http://localhost:5173"],

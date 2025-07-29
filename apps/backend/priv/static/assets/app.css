@@ -1,0 +1,7 @@
+/* Basic CSS for DevTeam AI Backend */
+body {
+  font-family: system-ui, sans-serif;
+  margin: 0;
+  padding: 20px;
+  background-color: #f9fafb;
+}

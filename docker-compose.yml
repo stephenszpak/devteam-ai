@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432"
+      - "5435:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -54,6 +54,10 @@ services:
       - devteam_network
     environment:
       BACKEND_URL: "http://backend:4000"
+      AI_PROVIDER: "${AI_PROVIDER:-openai}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      DEMO_MODE: "${DEMO_MODE:-true}"
 
 volumes:
   postgres_data:

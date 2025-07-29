@@ -27,6 +27,7 @@ defmodule DevteamAiWeb.Router do
     get "/tasks/:id", TaskController, :show
     get "/agents", AgentController, :index
     post "/messages", MessageController, :create
+    post "/agent_status", AgentController, :update_status
   end
 
   if Application.compile_env(:devteam_ai, :dev_routes) do
