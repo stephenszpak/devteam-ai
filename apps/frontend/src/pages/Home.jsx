@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import TaskInput from '../components/TaskInput'
 import AgentsList from '../components/AgentsList'
 import ChatLog from '../components/ChatLog'
+import CodeViewer from '../components/CodeViewer'
 import ConnectionStatus from '../components/ConnectionStatus'
 import webSocketService from '../services/websocket'
 
@@ -36,7 +37,19 @@ function Home() {
       })
       
       webSocketService.onTaskCompleted((task) => {
-        addMessage('system', `✅ Task completed: ${task.id}`)
+        addMessage('system', `✅ Task completed: ${task.task_id} - ${task.files_created?.length || 0} files created`)
+      })
+
+      webSocketService.onTaskProgress((progress) => {
+        addMessage('progress', `📈 ${progress.agent}: ${progress.stage} (${progress.progress}%) - ${progress.details}`)
+      })
+
+      webSocketService.onTaskFailed((error) => {
+        addMessage('error', `❌ Task failed: ${error.task_id} - ${error.error_message}`)
+      })
+
+      webSocketService.onFileCreated((file) => {
+        addMessage('file', `📄 File created: ${file.file_path} (${file.file_type})`)
       })
       
       webSocketService.onAgentStatusChange((agentUpdate) => {
@@ -113,6 +126,11 @@ function Home() {
         <div className="lg:col-span-2">
           <ChatLog messages={messages} />
         </div>
+      </div>
+      
+      {/* Full width Generated Code section */}
+      <div className="mt-8">
+        <CodeViewer />
       </div>
     </div>
   )

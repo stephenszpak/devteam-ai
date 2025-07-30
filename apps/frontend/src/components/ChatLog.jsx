@@ -10,10 +10,16 @@ function ChatLog({ messages }) {
               <span className={`text-sm font-medium ${
                 message.type === 'system' ? 'text-blue-600' :
                 message.type === 'agent' ? 'text-green-600' :
+                message.type === 'progress' ? 'text-purple-600' :
+                message.type === 'error' ? 'text-red-600' :
+                message.type === 'file' ? 'text-orange-600' :
                 'text-gray-600'
               }`}>
                 {message.type === 'system' ? 'System' :
-                 message.type === 'agent' ? 'Agent' : 'User'}
+                 message.type === 'agent' ? 'Agent' :
+                 message.type === 'progress' ? 'Progress' :
+                 message.type === 'error' ? 'Error' :
+                 message.type === 'file' ? 'File' : 'User'}
               </span>
               <span className="text-xs text-gray-500">
                 {message.timestamp?.toLocaleTimeString()}

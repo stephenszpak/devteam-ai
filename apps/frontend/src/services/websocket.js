@@ -5,6 +5,9 @@ class WebSocketService {
     this.callbacks = {
       taskCreated: [],
       taskCompleted: [],
+      taskProgress: [],
+      taskFailed: [],
+      fileCreated: [],
       agentStatusChange: []
     }
     this.reconnectInterval = null
@@ -73,7 +76,13 @@ class WebSocketService {
     if (data.event === 'task_created') {
       this.callbacks.taskCreated.forEach(callback => callback(data.payload))
     } else if (data.event === 'task_completed') {
-      this.callbacks.taskCompleted.forEach(callback => callback(data.payload))  
+      this.callbacks.taskCompleted.forEach(callback => callback(data.payload))
+    } else if (data.event === 'task_progress') {
+      this.callbacks.taskProgress.forEach(callback => callback(data.payload))
+    } else if (data.event === 'task_failed') {
+      this.callbacks.taskFailed.forEach(callback => callback(data.payload))
+    } else if (data.event === 'file_created') {
+      this.callbacks.fileCreated.forEach(callback => callback(data.payload))
     } else if (data.event === 'agent_status_change') {
       this.callbacks.agentStatusChange.forEach(callback => callback(data.payload))
     }
@@ -114,6 +123,19 @@ class WebSocketService {
       return Promise.resolve()
     }
     return Promise.reject(new Error('Not connected'))
+  }
+
+  // Enhanced task event methods
+  onTaskProgress(callback) {
+    this.callbacks.taskProgress.push(callback)
+  }
+
+  onTaskFailed(callback) {
+    this.callbacks.taskFailed.push(callback)
+  }
+
+  onFileCreated(callback) {
+    this.callbacks.fileCreated.push(callback)
   }
 
   // Agent-related methods

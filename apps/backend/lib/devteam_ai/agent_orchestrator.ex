@@ -1,16 +1,19 @@
 defmodule DevteamAi.AgentOrchestrator do
   use GenServer
+  alias DevteamAi.Tasks
 
   def start_link(_opts) do
-    GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
+    GenServer.start_link(__MODULE__, %{agents: %{}}, name: __MODULE__)
   end
 
   def init(state) do
+    # Schedule periodic task processing
+    :timer.send_interval(5000, :process_pending_tasks)
     {:ok, state}
   end
 
-  def create_task(task_description) do
-    GenServer.cast(__MODULE__, {:create_task, task_description})
+  def task_created(task) do
+    GenServer.cast(__MODULE__, {:task_created, task})
   end
 
   def get_agent_status do
@@ -21,36 +24,50 @@ defmodule DevteamAi.AgentOrchestrator do
     GenServer.cast(__MODULE__, {:update_agent_status, agent_id, status, task_id, message})
   end
 
-  def handle_cast({:create_task, task_description}, state) do
-    task_id = :crypto.strong_rand_bytes(8) |> Base.encode16() |> String.downcase()
-    
-    task = %{
-      id: task_id,
-      description: task_description,
-      status: "pending",
-      created_at: DateTime.utc_now(),
-      agents_assigned: []
-    }
-
-    new_state = Map.put(state, task_id, task)
-    
-    # Broadcast via PubSub and WebSocket
-    Phoenix.PubSub.broadcast(DevteamAi.PubSub, "tasks", {:task_created, task})
+  def handle_cast({:task_created, task}, state) do
+    # Broadcast via WebSocket
     DevteamAiWeb.Endpoint.broadcast("tasks:lobby", "task_created", %{
-      id: task_id,
-      description: task_description,
-      status: "pending",
-      created_at: DateTime.to_iso8601(task.created_at)
+      id: task.id,
+      description: task.description,
+      status: task.status,
+      priority: task.priority,
+      created_at: DateTime.to_iso8601(task.inserted_at)
     })
     
-    # Simulate agent status change
-    Process.send_after(self(), {:simulate_agent_work, task_id}, 2000)
+    # Trigger immediate processing attempt
+    send(self(), :process_pending_tasks)
     
-    {:noreply, new_state}
+    {:noreply, state}
   end
 
   def handle_cast({:update_agent_status, agent_id, status, task_id, message}, state) do
-    # Store agent status in state if needed
+    # Update agent status in state
+    updated_agents = Map.put(state.agents, agent_id, %{
+      status: status,
+      current_task: task_id,
+      last_update: DateTime.utc_now()
+    })
+    
+    # Update task in database if task_id is provided
+    if task_id do
+      case Tasks.get_task(task_id) do
+        nil -> :ok
+        task ->
+          case status do
+            "working" -> Tasks.assign_task(task, agent_id)
+            "completed" -> 
+              result = %{
+                "agent" => agent_id,
+                "message" => message,
+                "completed_at" => DateTime.utc_now()
+              }
+              Tasks.complete_task(task, result)
+            "failed" -> Tasks.fail_task(task, message)
+            _ -> :ok
+          end
+      end
+    end
+    
     IO.puts("Agent #{agent_id} status updated: #{status} - #{message}")
     
     # Broadcast via WebSocket
@@ -62,66 +79,72 @@ defmodule DevteamAi.AgentOrchestrator do
       timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
     })
     
-    {:noreply, state}
+    {:noreply, %{state | agents: updated_agents}}
   end
 
-  def handle_info({:simulate_agent_work, task_id}, state) do
-    # Simulate agent picking up task
-    DevteamAiWeb.Endpoint.broadcast("agents:lobby", "agent_status_change", %{
-      agent: "frontend_coder",
-      status: "working",
-      current_task: task_id,
-      message: "Started working on task: #{task_id}"
-    })
-    
-    # Simulate work completion after 5 seconds
-    Process.send_after(self(), {:simulate_completion, task_id}, 5000)
-    
-    {:noreply, state}
-  end
-
-  def handle_info({:simulate_completion, task_id}, state) do
-    # Update task status
-    updated_state = case Map.get(state, task_id) do
-      nil -> state
-      task -> 
-        updated_task = %{task | status: "completed"}
-        Map.put(state, task_id, updated_task)
+  def handle_info(:process_pending_tasks, state) do
+    # Get next pending task
+    case Tasks.get_next_pending_task() do
+      nil -> 
+        {:noreply, state}
+        
+      task ->
+        # Find available agent
+        available_agent = find_available_agent()
+        
+        if available_agent do
+          # Assign task to agent
+          case Tasks.assign_task(task, available_agent) do
+            {:ok, updated_task} ->
+              # Broadcast task assignment
+              DevteamAiWeb.Endpoint.broadcast("tasks:lobby", "task_assigned", %{
+                id: updated_task.id,
+                status: updated_task.status,
+                assigned_agent: updated_task.assigned_agent
+              })
+              
+              DevteamAiWeb.Endpoint.broadcast("agents:lobby", "agent_status_change", %{
+                agent: available_agent,
+                status: "working",
+                current_task: updated_task.id,
+                message: "Processing task: #{String.slice(updated_task.description, 0, 50)}...",
+                timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
+              })
+              
+            {:error, _changeset} ->
+              IO.puts("Failed to assign task #{task.id} to agent #{available_agent}")
+          end
+        end
+        
+        {:noreply, state}
     end
-    
-    # Broadcast completion
-    DevteamAiWeb.Endpoint.broadcast("tasks:lobby", "task_completed", %{
-      id: task_id,
-      status: "completed",
-      completed_at: DateTime.utc_now() |> DateTime.to_iso8601()
-    })
-    
-    DevteamAiWeb.Endpoint.broadcast("agents:lobby", "agent_status_change", %{
-      agent: "frontend_coder", 
-      status: "idle",
-      current_task: nil,
-      message: "Completed task: #{task_id}"
-    })
-    
-    {:noreply, updated_state}
   end
 
   def handle_call(:get_agent_status, _from, state) do
-    agents = [
-      %{name: "frontend_coder", status: "idle", current_task: nil},
-      %{name: "backend_coder", status: "idle", current_task: nil},
-      %{name: "reviewer", status: "idle", current_task: nil}
+    # Return both static agent info and dynamic status
+    base_agents = [
+      %{name: "frontend_coder", type: "frontend", capabilities: ["React", "JavaScript", "CSS"]},
+      %{name: "backend_coder", type: "backend", capabilities: ["Phoenix", "Elixir", "Database"]},
+      %{name: "reviewer", type: "qa", capabilities: ["Code Review", "Testing", "Quality Assurance"]}
     ]
+    
+    agents = Enum.map(base_agents, fn agent ->
+      status_info = Map.get(state.agents, agent.name, %{
+        status: "idle",
+        current_task: nil,
+        last_update: nil
+      })
+      
+      Map.merge(agent, status_info)
+    end)
     
     {:reply, agents, state}
   end
 
-  def handle_call({:get_task, task_id}, _from, state) do
-    task = Map.get(state, task_id)
-    {:reply, task, state}
-  end
-
-  def get_task(task_id) do
-    GenServer.call(__MODULE__, {:get_task, task_id})
+  # Helper function to find available agent
+  defp find_available_agent do
+    # Simple round-robin for now, could be enhanced with agent capabilities
+    available_agents = ["frontend_coder", "backend_coder", "reviewer"]
+    Enum.random(available_agents)
   end
 end
