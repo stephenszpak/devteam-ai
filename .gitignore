@@ -92,3 +92,6 @@ tmp/
 temp/
 *.tmp
 *.temp
+
+# Generated code (dynamic content)
+agents/generated_code/

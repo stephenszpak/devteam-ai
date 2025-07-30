@@ -20,7 +20,7 @@ defmodule DevteamAiWeb.TaskProgressController do
           "current_stage" => stage,
           "stage_details" => stage_details,
           "last_updated_by" => agent_id,
-          "last_updated_at" => DateTime.from_unix!(timestamp)
+          "last_updated_at" => DateTime.from_unix!(trunc(timestamp))
         }
         
         # Store progress in task result or metadata
@@ -35,7 +35,7 @@ defmodule DevteamAiWeb.TaskProgressController do
               stage: stage,
               details: stage_details,
               agent: agent_id,
-              timestamp: DateTime.to_iso8601(DateTime.from_unix!(timestamp))
+              timestamp: DateTime.to_iso8601(DateTime.from_unix!(trunc(timestamp)))
             })
             
             json(conn, %{status: "progress_updated", progress: progress, stage: stage})
@@ -89,7 +89,7 @@ defmodule DevteamAiWeb.TaskProgressController do
               file_type: file_type,
               description: description,
               agent: agent_id,
-              timestamp: DateTime.to_iso8601(DateTime.from_unix!(timestamp))
+              timestamp: DateTime.to_iso8601(DateTime.from_unix!(trunc(timestamp)))
             })
             
             json(conn, %{status: "file_recorded", file_path: file_path})
@@ -125,7 +125,7 @@ defmodule DevteamAiWeb.TaskProgressController do
           "status" => "completed",
           "result" => completion_result,
           "files_created" => files_created,
-          "completed_at" => DateTime.from_unix!(completion_time)
+          "completed_at" => DateTime.from_unix!(trunc(completion_time))
         }
         
         case Tasks.update_task(task, completion_attrs) do
@@ -137,7 +137,7 @@ defmodule DevteamAiWeb.TaskProgressController do
               files_created: files_created,
               result: completion_result,
               agent: agent_id,
-              completed_at: DateTime.to_iso8601(DateTime.from_unix!(completion_time))
+              completed_at: DateTime.to_iso8601(DateTime.from_unix!(trunc(completion_time)))
             })
             
             json(conn, %{
@@ -182,7 +182,7 @@ defmodule DevteamAiWeb.TaskProgressController do
           "status" => "failed",
           "error_message" => error_message,
           "result" => error_result,
-          "completed_at" => DateTime.from_unix!(timestamp)
+          "completed_at" => DateTime.from_unix!(trunc(timestamp))
         }
         
         case Tasks.update_task(task, error_attrs) do
@@ -194,7 +194,7 @@ defmodule DevteamAiWeb.TaskProgressController do
               error_type: error_type,
               error_message: error_message,
               agent: agent_id,
-              failed_at: DateTime.to_iso8601(DateTime.from_unix!(timestamp))
+              failed_at: DateTime.to_iso8601(DateTime.from_unix!(trunc(timestamp)))
             })
             
             json(conn, %{status: "error_reported", error_type: error_type})

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
+import CodeSandbox from './CodeSandbox'
 
 function CodeViewer() {
   const [generatedFiles, setGeneratedFiles] = useState([])
   const [selectedFile, setSelectedFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [expandedFolders, setExpandedFolders] = useState(new Set())
+  const [viewMode, setViewMode] = useState('code') // 'code', 'preview', 'split'
 
   useEffect(() => {
     fetchGeneratedCode()
@@ -108,18 +110,58 @@ function CodeViewer() {
     <div className="bg-white rounded-lg shadow-md p-6 mt-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold">Generated Code</h2>
-        <button
-          onClick={fetchGeneratedCode}
-          disabled={loading}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
-        >
-          {loading ? '🔄' : '↻'} Refresh
-        </button>
+        <div className="flex items-center space-x-3">
+          {/* View Mode Toggle */}
+          <div className="flex bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('code')}
+              className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                viewMode === 'code' 
+                  ? 'bg-white text-gray-900 shadow-sm' 
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              📄 Code
+            </button>
+            <button
+              onClick={() => setViewMode('preview')}
+              className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                viewMode === 'preview' 
+                  ? 'bg-white text-gray-900 shadow-sm' 
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              🔍 Preview
+            </button>
+            <button
+              onClick={() => setViewMode('split')}
+              className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                viewMode === 'split' 
+                  ? 'bg-white text-gray-900 shadow-sm' 
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              ⚡ Split
+            </button>
+          </div>
+          
+          <button
+            onClick={fetchGeneratedCode}
+            disabled={loading}
+            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
+          >
+            {loading ? '🔄' : '↻'} Refresh
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
-        {/* File List */}
-        <div className="border rounded-lg overflow-hidden">
+      <div className={`flex gap-6 h-[600px] ${
+        viewMode === 'preview' ? 'flex-row' : 'flex-row'
+      }`}>
+        {/* File List - Always visible but smaller in preview mode */}
+        <div className={`border rounded-lg overflow-hidden ${
+          viewMode === 'preview' ? 'w-80' : 'flex-shrink-0 w-80'
+        }`}>
           <div className="bg-gray-50 px-3 py-2 border-b">
             <h3 className="text-sm font-medium text-gray-700">Files ({generatedFiles.length})</h3>
           </div>
@@ -176,26 +218,45 @@ function CodeViewer() {
           </div>
         </div>
 
-        {/* Code Preview */}
-        <div className="lg:col-span-2 border rounded-lg overflow-hidden">
-          <div className="bg-gray-50 px-3 py-2 border-b">
-            <h3 className="text-sm font-medium text-gray-700">
-              {selectedFile ? selectedFile.filename : 'Code Preview'}
-            </h3>
-          </div>
-          <div className="overflow-y-auto h-full">
-            {selectedFile ? (
-              <pre className="p-4 text-sm bg-gray-900 text-gray-100 h-full overflow-auto">
-                <code className={`language-${getLanguage(selectedFile.filename)}`}>
-                  {selectedFile.content}
-                </code>
-              </pre>
-            ) : (
-              <div className="p-4 text-center text-gray-500 h-full flex items-center justify-center">
-                Select a file to view its content
+        {/* Content Area - Dynamic based on view mode */}
+        <div className="flex-1 flex gap-6">
+          {/* Code Panel */}
+          {(viewMode === 'code' || viewMode === 'split') && (
+            <div className={`border rounded-lg overflow-hidden ${
+              viewMode === 'split' ? 'flex-1' : 'w-full'
+            }`}>
+              <div className="bg-gray-50 px-3 py-2 border-b">
+                <h3 className="text-sm font-medium text-gray-700">
+                  {selectedFile ? selectedFile.filename : 'Code Preview'}
+                </h3>
               </div>
-            )}
-          </div>
+              <div className="overflow-y-auto h-full">
+                {selectedFile ? (
+                  <pre className="p-4 text-sm bg-gray-900 text-gray-100 h-full overflow-auto">
+                    <code className={`language-${getLanguage(selectedFile.filename)}`}>
+                      {selectedFile.content}
+                    </code>
+                  </pre>
+                ) : (
+                  <div className="p-4 text-center text-gray-500 h-full flex items-center justify-center">
+                    Select a file to view its content
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Sandbox Panel */}
+          {(viewMode === 'preview' || viewMode === 'split') && (
+            <div className={`border rounded-lg overflow-hidden ${
+              viewMode === 'split' ? 'flex-1' : 'w-full'
+            }`}>
+              <CodeSandbox 
+                code={selectedFile?.content} 
+                filename={selectedFile?.filename}
+              />
+            </div>
+          )}
         </div>
       </div>
 
