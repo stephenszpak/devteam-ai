@@ -24,8 +24,14 @@ defmodule DevteamAiWeb.GeneratedCodeController do
     
     # Transform to match frontend expectations
     file_list = files |> Enum.map(fn file ->
+      # Normalize path for frontend (remove absolute path prefix if present)
+      normalized_path = case file.path do
+        "/app/generated_code/" <> relative_path -> relative_path
+        path -> path
+      end
+      
       %{
-        path: file.path,
+        path: normalized_path,
         filename: file.filename,
         taskDescription: file.task_description || "Generated code",
         createdAt: DateTime.to_iso8601(file.created_at),
@@ -43,8 +49,17 @@ defmodule DevteamAiWeb.GeneratedCodeController do
   end
 
   def show(conn, %{"path" => file_path}) do
-    # Look up the file in the database by file_path
-    case Repo.get_by(GeneratedFile, file_path: file_path) do
+    # Look up the file in the database by file_path, handling both absolute and relative paths
+    file = case Repo.get_by(GeneratedFile, file_path: file_path) do
+      nil ->
+        # Try with absolute path if relative path didn't work
+        absolute_path = "/app/generated_code/" <> file_path
+        Repo.get_by(GeneratedFile, file_path: absolute_path)
+      found_file ->
+        found_file
+    end
+    
+    case file do
       nil ->
         conn
         |> put_status(404)

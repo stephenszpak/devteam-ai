@@ -112,7 +112,9 @@ Always provide complete, working code that can be directly used in a project."""
             for file_path in created_files:
                 file_type = self._determine_file_type(file_path)
                 description = self._get_file_description(file_path, code_artifacts)
-                self.notify_file_created(task_id, file_path, file_type, description)
+                # Extract relative path for API compatibility
+                relative_path = self._extract_relative_path(file_path)
+                self.notify_file_created(task_id, relative_path, file_type, description)
             
             # Stage 5: Complete the task (100% progress)
             processing_time = time.time() - start_time
@@ -201,6 +203,191 @@ Always provide complete, working code that can be directly used in a project."""
             return f"Documentation: {filename}"
         else:
             return f"Generated file: {filename}"
+    
+    def _extract_relative_path(self, absolute_path: str) -> str:
+        """Extract relative path from absolute file path for API compatibility"""
+        # Remove the base generated_code path to get relative path
+        base_path = "/app/generated_code/"
+        if absolute_path.startswith(base_path):
+            return absolute_path[len(base_path):]
+        
+        # Fallback: just use the filename if path doesn't match expected format
+        return os.path.basename(absolute_path)
+    
+    def _generate_smart_filename(self, code_content: str, task_description: str, index: int) -> str:
+        """Generate meaningful filename based on code content and task description"""
+        import re
+        
+        # Try to extract component name from React/JS code
+        component_name = self._extract_component_name(code_content)
+        if component_name:
+            extension = self._determine_file_extension(code_content)
+            return f"{component_name}{extension}"
+        
+        # Try to extract meaningful name from task description
+        task_based_name = self._extract_name_from_task(task_description, index)
+        if task_based_name:
+            extension = self._determine_file_extension(code_content)
+            return f"{task_based_name}{extension}"
+        
+        # Fallback with more descriptive naming
+        file_type = self._detect_code_type(code_content)
+        extension = self._determine_file_extension(code_content)
+        return f"{file_type}_{index + 1}{extension}"
+    
+    def _extract_component_name(self, code_content: str) -> str:
+        """Extract React component name from code"""
+        import re
+        
+        # Look for React component patterns
+        patterns = [
+            r'const\s+([A-Z][a-zA-Z0-9]*)\s*[=:].*?React\.FC',  # const ComponentName: React.FC
+            r'function\s+([A-Z][a-zA-Z0-9]*)\s*\(',  # function ComponentName(
+            r'const\s+([A-Z][a-zA-Z0-9]*)\s*=\s*\(',  # const ComponentName = (  
+            r'export\s+default\s+([A-Z][a-zA-Z0-9]*)',  # export default ComponentName
+            r'class\s+([A-Z][a-zA-Z0-9]*)',  # class ComponentName
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, code_content)
+            if match:
+                return match.group(1)
+        
+        return None
+    
+    def _extract_name_from_task(self, task_description: str, index: int) -> str:
+        """Extract meaningful name from task description"""
+        import re
+        
+        # Convert task description to a suitable filename
+        task_lower = task_description.lower()
+        
+        # Look for specific component types mentioned
+        component_types = {
+            'accordion': 'Accordion',
+            'modal': 'Modal', 
+            'button': 'Button',
+            'card': 'Card',
+            'form': 'Form',
+            'input': 'Input',
+            'dropdown': 'Dropdown',
+            'navigation': 'Navigation',
+            'nav': 'Navigation',
+            'header': 'Header',
+            'footer': 'Footer',
+            'sidebar': 'Sidebar',
+            'menu': 'Menu',
+            'table': 'Table',
+            'list': 'List',
+            'grid': 'Grid',
+            'carousel': 'Carousel',
+            'slider': 'Slider',
+            'tab': 'Tab',
+            'tooltip': 'Tooltip',
+            'alert': 'Alert',
+            'badge': 'Badge',
+            'avatar': 'Avatar',
+            'spinner': 'Spinner',
+            'loader': 'Loader',
+            'progress': 'ProgressBar',
+            'checkbox': 'Checkbox',
+            'radio': 'RadioButton',
+            'toggle': 'Toggle',
+            'switch': 'Switch'
+        }
+        
+        for keyword, component_name in component_types.items():
+            if keyword in task_lower:
+                if index > 0:
+                    return f"{component_name}_{index + 1}"
+                return component_name
+        
+        # Extract first meaningful word and capitalize it
+        words = re.findall(r'\b[a-zA-Z]+\b', task_description)
+        if words:
+            meaningful_word = next((word for word in words if len(word) > 3 and word.lower() not in ['create', 'build', 'make', 'generate', 'component']), None)
+            if meaningful_word:
+                return meaningful_word.capitalize()
+        
+        return None
+    
+    def _detect_code_type(self, code_content: str) -> str:
+        """Detect the type of code to generate appropriate filename"""
+        content_lower = code_content.lower()
+        
+        if 'react' in content_lower or 'jsx' in content_lower or 'usestate' in content_lower:
+            return 'Component'
+        elif 'css' in content_lower or '@apply' in content_lower or 'background' in content_lower:
+            return 'Styles'
+        elif 'test' in content_lower or 'describe' in content_lower or 'it(' in content_lower:
+            return 'Test'
+        elif 'interface' in content_lower or 'type' in content_lower:
+            return 'Types'
+        else:
+            return 'Module'
+    
+    def _determine_file_extension(self, code_content: str) -> str:
+        """Determine appropriate file extension based on code content"""
+        content_lower = code_content.lower()
+        
+        if 'interface' in content_lower and ('react' in content_lower or 'jsx' in content_lower):
+            return '.tsx'
+        elif 'react' in content_lower or 'jsx' in content_lower or 'usestate' in content_lower:
+            return '.jsx'
+        elif 'typescript' in content_lower or ': string' in content_lower or ': number' in content_lower:
+            return '.ts'
+        elif any(css_indicator in content_lower for css_indicator in ['@apply', 'background:', 'color:', 'margin:', 'padding:']):
+            return '.css'
+        elif '.scss' in content_lower or '@mixin' in content_lower:
+            return '.scss'
+        elif 'test' in content_lower or 'describe(' in content_lower:
+            return '.test.js'
+        else:
+            return '.jsx'  # Default for React components
+    
+    def _organize_files_by_type(self, code_files: Dict[str, str], task_id: str) -> Dict[str, str]:
+        """Organize files into a logical folder structure"""
+        organized = {}
+        component_name = None
+        
+        # First pass: identify the main component name
+        for filename, _ in code_files.items():
+            if filename.endswith(('.jsx', '.tsx')):
+                # Extract component name from filename (remove extension)
+                potential_name = filename.split('.')[0]
+                if potential_name and potential_name != 'Component':
+                    component_name = potential_name
+                    break
+        
+        # If no clear component name, use task-based naming
+        if not component_name:
+            component_name = f"task_{task_id}"
+        
+        # Second pass: organize files by type
+        for filename, content in code_files.items():
+            if filename.endswith(('.jsx', '.tsx')):
+                # Main component files go in the component folder
+                organized[f"{component_name}/{filename}"] = content
+            elif filename.endswith(('.css', '.scss')):
+                # Styles go in a styles subfolder
+                organized[f"{component_name}/styles/{filename}"] = content
+            elif filename.endswith(('.test.js', '.test.jsx', '.test.ts', '.test.tsx')):
+                # Tests go in a tests subfolder
+                organized[f"{component_name}/tests/{filename}"] = content
+            elif filename.endswith(('.ts', '.d.ts')):
+                # Type definitions go in a types subfolder  
+                organized[f"{component_name}/types/{filename}"] = content
+            elif filename.endswith('.md'):
+                # Documentation goes in the root or docs folder
+                if 'README' in filename.upper():
+                    organized[f"{component_name}/{filename}"] = content
+                else:
+                    organized[f"{component_name}/docs/{filename}"] = content
+            else:
+                # Other files go in the main component folder
+                organized[f"{component_name}/{filename}"] = content
+        
+        return organized
     
     def _create_code_generation_prompt(self, task_description: str) -> str:
         """Create a detailed prompt for AI code generation"""
@@ -311,7 +498,7 @@ Please structure your response as follows:
                 code_blocks = re.findall(r'```(?:jsx?|tsx?|css|javascript|typescript)?\n(.*?)\n```', ai_response, re.DOTALL)
                 if code_blocks:
                     for i, code in enumerate(code_blocks):
-                        filename = f"generated_component_{i+1}.jsx"
+                        filename = self._generate_smart_filename(code.strip(), task_description, i)
                         artifacts["code_files"][filename] = code.strip()
             
             return artifacts
@@ -328,9 +515,8 @@ Please structure your response as follows:
             }
     
     def _write_code_files(self, artifacts: Dict[str, Any], task_id: str) -> List[str]:
-        """Write generated code files to disk"""
+        """Write generated code files to disk with organized structure"""
         created_files = []
-        subfolder = f"task_{task_id}"
         
         # Defensive programming: handle case where artifacts is not a dict
         if not isinstance(artifacts, dict):
@@ -344,8 +530,20 @@ Please structure your response as follows:
                 "notes": "Generated with fallback parsing"
             }
         
-        for filename, content in artifacts.get("code_files", {}).items():
+        # Organize files by type and create appropriate folder structure
+        organized_files = self._organize_files_by_type(artifacts.get("code_files", {}), task_id)
+        
+        for organized_path, content in organized_files.items():
             if content.strip():  # Only write non-empty files
+                # Split the organized path to separate folder and filename
+                path_parts = organized_path.split('/')
+                if len(path_parts) > 1:
+                    subfolder = '/'.join(path_parts[:-1])
+                    filename = path_parts[-1]
+                else:
+                    subfolder = f"task_{task_id}"
+                    filename = organized_path
+                
                 filepath = self.write_file(filename, content, subfolder)
                 if not filepath.startswith("Error:"):
                     created_files.append(filepath)

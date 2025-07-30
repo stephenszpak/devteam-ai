@@ -4,6 +4,7 @@ function CodeViewer() {
   const [generatedFiles, setGeneratedFiles] = useState([])
   const [selectedFile, setSelectedFile] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [expandedFolders, setExpandedFolders] = useState(new Set())
 
   useEffect(() => {
     fetchGeneratedCode()
@@ -65,6 +66,44 @@ function CodeViewer() {
     return 'text'
   }
 
+  const organizeFilesByFolder = (files) => {
+    const organized = {}
+    
+    files.forEach(file => {
+      const pathParts = file.path.split('/')
+      if (pathParts.length > 1) {
+        // File is in a folder
+        const folderPath = pathParts.slice(0, -1).join('/')
+        if (!organized[folderPath]) {
+          organized[folderPath] = []
+        }
+        organized[folderPath].push(file)
+      } else {
+        // File is in root
+        if (!organized['__root__']) {
+          organized['__root__'] = []
+        }
+        organized['__root__'].push(file)
+      }
+    })
+    
+    return organized
+  }
+
+  const toggleFolder = (folderPath) => {
+    const newExpanded = new Set(expandedFolders)
+    if (newExpanded.has(folderPath)) {
+      newExpanded.delete(folderPath)
+    } else {
+      newExpanded.add(folderPath)
+    }
+    setExpandedFolders(newExpanded)
+  }
+
+  const getFolderIcon = (isExpanded) => {
+    return isExpanded ? '📂' : '📁'
+  }
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6 mt-6">
       <div className="flex items-center justify-between mb-4">
@@ -91,23 +130,47 @@ function CodeViewer() {
               </div>
             ) : (
               <div className="space-y-1 p-2">
-                {generatedFiles.map((file, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleFileSelect(file)}
-                    className={`w-full text-left p-2 rounded hover:bg-gray-100 text-sm ${
-                      selectedFile?.path === file.path ? 'bg-blue-50 border border-blue-200' : ''
-                    }`}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <span>{getFileIcon(file.filename)}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{file.filename}</div>
-                        <div className="text-xs text-gray-500 truncate">{file.taskDescription}</div>
-                      </div>
+                {(() => {
+                  const organizedFiles = organizeFilesByFolder(generatedFiles)
+                  return Object.entries(organizedFiles).map(([folderPath, files]) => (
+                    <div key={folderPath}>
+                      {folderPath !== '__root__' && (
+                        <button
+                          onClick={() => toggleFolder(folderPath)}
+                          className="w-full text-left p-2 hover:bg-gray-50 text-sm font-medium text-gray-700 flex items-center space-x-2"
+                        >
+                          <span>{getFolderIcon(expandedFolders.has(folderPath))}</span>
+                          <span>{folderPath.split('/').pop()}</span>
+                          <span className="text-xs text-gray-400">({files.length})</span>
+                        </button>
+                      )}
+                      
+                      {(folderPath === '__root__' || expandedFolders.has(folderPath)) && (
+                        <div className={folderPath !== '__root__' ? 'ml-4' : ''}>
+                          {files.map((file, index) => (
+                            <button
+                              key={`${folderPath}-${index}`}
+                              onClick={() => handleFileSelect(file)}
+                              className={`w-full text-left p-2 rounded hover:bg-gray-100 text-sm ${
+                                selectedFile?.path === file.path ? 'bg-blue-50 border border-blue-200' : ''
+                              }`}
+                            >
+                              <div className="flex items-center space-x-2">
+                                <span>{getFileIcon(file.filename)}</span>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium truncate">{file.filename}</div>
+                                  <div className="text-xs text-gray-500 truncate">
+                                    {file.taskDescription} {file.agent && `• ${file.agent}`}
+                                  </div>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  </button>
-                ))}
+                  ))
+                })()}
               </div>
             )}
           </div>
